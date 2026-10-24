@@ -1,0 +1,12 @@
+# Binary and large archive files
+*.apk
+*.zip
+*.tar.gz
+
+# Dependency & runtime
+node_modules/
+.env
+
+# OS & Temp
+.DS_Store
+Thumbs.db
