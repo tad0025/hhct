@@ -114,10 +114,17 @@ class TaskRunner {
 
       await new Promise(r => setTimeout(r, 1000));
 
+      const shouldSyncWithDan = currentNaudan < 5 && naudanResult.isCooking;
+      const canRunDailyAffairs = !shouldSyncWithDan || naudanResult.hasAction;
+
       if (currentCungvu < 5) {
-        const affair = new AffairService(client);
-        cungvuResult = await affair.execute();
-        affair.destroy();
+        if (canRunDailyAffairs) {
+          const affair = new AffairService(client);
+          cungvuResult = await affair.execute();
+          affair.destroy();
+        } else {
+          console.log(`[${account.email}] 📜 [Cung Vụ] Đang chờ mẻ đan chín để gom làm cùng lúc. Tạm hoãn để tích lũy lượt.`);
+        }
       } else {
         console.log(`[${account.email}] 📜 [Cung Vụ] Đã đạt chỉ tiêu 5/5 lần hôm nay. Bỏ qua.`);
       }
@@ -125,9 +132,13 @@ class TaskRunner {
       await new Promise(r => setTimeout(r, 1000));
 
       if (currentNoivu < 5) {
-        const trade = new TradeService(client);
-        noivuResult = await trade.execute();
-        trade.destroy();
+        if (canRunDailyAffairs) {
+          const trade = new TradeService(client);
+          noivuResult = await trade.execute();
+          trade.destroy();
+        } else {
+          console.log(`[${account.email}] 💼 [Nội Vụ] Đang chờ mẻ đan chín để gom làm cùng lúc. Tạm hoãn để tích lũy lượt.`);
+        }
       } else {
         console.log(`[${account.email}] 💼 [Nội Vụ] Đã đạt chỉ tiêu 5/5 lần hôm nay. Bỏ qua.`);
       }
@@ -140,14 +151,18 @@ class TaskRunner {
       if (updatedNaudan >= 5 && updatedCungvu >= 5 && updatedNoivu >= 5) {
         nextRunTime = getTomorrowMidnightGMT7();
         console.log(`[${account.email}] 🎉 Đã hoàn tất toàn bộ nhiệm vụ trong ngày (5/5). Đặt lịch chạy tiếp vào đầu ngày mai: ${nextRunTime}`);
+      } else if (updatedNaudan < 5) {
+        const cookCooldown = Number(naudanResult.minRemainSec) || 3600;
+        const effectiveCooldown = Math.max(300, cookCooldown + 30);
+        nextRunTime = new Date(Date.now() + effectiveCooldown * 1000);
+        console.log(`[${account.email}] 🍲 Đang chờ mẻ đan chín. Lượt chạy tiếp theo sau ${Math.round(effectiveCooldown / 60)} phút (${nextRunTime.toISOString()})`);
       } else {
         const cooldownCandidates = [];
-        if (updatedNaudan < 5) cooldownCandidates.push(naudanResult.minRemainSec || 3600);
         if (updatedCungvu < 5) cooldownCandidates.push(cungvuResult.remainSec || 1800);
         if (updatedNoivu < 5) cooldownCandidates.push(noivuResult.minRemainSec || 600);
 
         const rawMin = Math.min(...cooldownCandidates);
-        const effectiveCooldown = Math.max(300, Math.min(7200, rawMin));
+        const effectiveCooldown = Math.max(300, rawMin);
         nextRunTime = new Date(Date.now() + effectiveCooldown * 1000);
         console.log(`[${account.email}] ⏰ Lượt chạy tiếp theo sau ${Math.round(effectiveCooldown / 60)} phút (${nextRunTime.toISOString()})`);
       }

@@ -180,10 +180,13 @@ class KitchenService extends BaseService {
 
     console.log(`[${this.client.email}] 🍲 [Ngự Thiện Hoàn Tất] Thu hoạch: ${reapedCount} | Đã nấu: ${cookedCount} | Món kế tiếp chín sau: ${formatDuration(minRemainSec)}`);
 
+    const isCooking = (this.cookList || []).some(s => s.status === STOVE_STATUS.COOKING);
+
     return {
       reapedCount,
       cookedCount,
       minRemainSec,
+      isCooking,
       hasAction: reapedCount > 0 || cookedCount > 0
     };
   }

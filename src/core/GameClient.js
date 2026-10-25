@@ -85,7 +85,8 @@ class GameClient {
         }
       };
 
-      this.encryptHelper.generateGameServerCode(this.serverInfo.serverId, this.rcode);
+      const targetCodeServerId = (Number(this.serverInfo.mainServerId) > 0) ? Number(this.serverInfo.mainServerId) : Number(this.serverInfo.serverId);
+      this.encryptHelper.generateGameServerCode(targetCodeServerId, this.rcode);
       this.autoId = this.encryptHelper.autoAddCode + 1;
 
       const wsUrl = `wss://${this.serverInfo.ip}:${this.serverInfo.port}`;
