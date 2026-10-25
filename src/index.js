@@ -4,6 +4,16 @@ const { loadAccounts } = require('./config/AccountLoader');
 const NoteManager = require('./core/NoteManager');
 const TaskRunner = require('./runners/TaskRunner');
 
+function parseNextRunTimestamp(dateStr) {
+  if (typeof dateStr !== 'string') return 0;
+  const s = dateStr.trim();
+  if (s.length === 0) return 0;
+  if (s.includes('Z') || s.includes('+')) {
+    return new Date(s).getTime();
+  }
+  return new Date(s.replace(' ', 'T') + '+07:00').getTime();
+}
+
 async function runCycle(accounts, runner, isOnce = false) {
   for (const acc of accounts) {
     try {
@@ -58,26 +68,57 @@ async function main() {
     console.log(`[HTTP] Web Service đang lắng nghe tại cổng ${CONFIG.PORT}`);
   });
 
+  const selfUrl = process.env.RENDER_EXTERNAL_URL;
+  if (typeof selfUrl === 'string' && selfUrl.length > 0) {
+    setInterval(async () => {
+      try {
+        await fetch(selfUrl + '/health');
+      } catch (_) {}
+    }, 600000);
+  }
+
   await runCycle(activeAccounts, runner, false);
 
   console.log('\n[Scheduler] ⏳ Bắt đầu vòng lập lịch kiểm tra theo thời gian nextRunTime (chu kỳ 60s)...');
 
+  let tickCount = 0;
+  const runningAccounts = new Set();
+
   setInterval(async () => {
+    tickCount++;
     try {
       const noteData = await noteManager.fetchNoteData();
       const now = Date.now();
+      const shouldLogStatus = (tickCount % 10 === 0);
 
       for (const acc of activeAccounts) {
-        const accRecord = noteData && (noteData[acc.accKey] || (noteData.accounts && noteData.accounts[acc.accKey]));
-        if (!accRecord || !accRecord.nextRun) {
-          await runner.runAccount(acc);
+        if (runningAccounts.has(acc.accKey)) {
           continue;
         }
 
-        const nextRunTimestamp = new Date(accRecord.nextRun).getTime();
+        const accRecord = noteData && (noteData[acc.accKey] || (noteData.accounts && noteData.accounts[acc.accKey]));
+        if (!accRecord || !accRecord.nextRun) {
+          runningAccounts.add(acc.accKey);
+          try {
+            await runner.runAccount(acc);
+          } finally {
+            runningAccounts.delete(acc.accKey);
+          }
+          continue;
+        }
+
+        const nextRunTimestamp = parseNextRunTimestamp(accRecord.nextRun);
         if (now >= nextRunTimestamp) {
           console.log(`[Scheduler] ⏰ Đến thời điểm chạy tiếp theo của [${acc.email} - S${acc.serverId}]. Kích hoạt phiên...`);
-          await runner.runAccount(acc);
+          runningAccounts.add(acc.accKey);
+          try {
+            await runner.runAccount(acc);
+          } finally {
+            runningAccounts.delete(acc.accKey);
+          }
+        } else if (shouldLogStatus) {
+          const diffMin = Math.max(1, Math.round((nextRunTimestamp - now) / 60000));
+          console.log(`[Scheduler] ⏳ [${acc.email} - S${acc.serverId}] Dự kiến chạy tiếp sau ${diffMin} phút (${accRecord.nextRun})`);
         }
       }
     } catch (err) {
