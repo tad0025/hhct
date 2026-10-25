@@ -49,9 +49,9 @@ class TaskRunner {
       currentNoivu = typeof todayHistory.noi === 'number' ? todayHistory.noi : (Number(todayHistory.noivu) || 0);
     }
 
-    if (currentNaudan >= 5 && currentCungvu >= 5 && currentNoivu >= 5) {
+    if (currentNaudan >= 5) {
       const nextRun = getTomorrowMidnightGMT7();
-      console.log(`[${account.email}] 🎯 Tài khoản đã hoàn thành toàn bộ 5/5 lượt cho cả 3 nhiệm vụ hôm nay.`);
+      console.log(`[${account.email}] 🎯 Tài khoản đã hoàn thành 5/5 lượt nấu đan hôm nay (Cung vụ: ${currentCungvu}, Nội vụ: ${currentNoivu}).`);
       console.log(`[${account.email}] ⏰ Hẹn giờ chạy tiếp theo vào ngày mai: ${nextRun}`);
       await this.noteManager.updateAccountRun(account, {
         roleName: accRecord?.name || '',
@@ -63,7 +63,7 @@ class TaskRunner {
       return { success: true, skipped: true, nextRunTime: nextRun };
     }
 
-    console.log(`[${account.email}] 📊 Tiến độ hiện tại trong ngày: Nấu đan: ${currentNaudan}/5 | Cung vụ: ${currentCungvu}/5 | Nội vụ: ${currentNoivu}/5`);
+    console.log(`[${account.email}] 📊 Tiến độ hiện tại trong ngày: Nấu đan: ${currentNaudan}/5 | Cung vụ: ${currentCungvu} | Nội vụ: ${currentNoivu}`);
 
     const encryptHelper = new EncryptHelper();
     let client = null;
@@ -117,30 +117,22 @@ class TaskRunner {
       const shouldSyncWithDan = currentNaudan < 5 && naudanResult.isCooking;
       const canRunDailyAffairs = !shouldSyncWithDan || naudanResult.hasAction;
 
-      if (currentCungvu < 5) {
-        if (canRunDailyAffairs) {
-          const affair = new AffairService(client);
-          cungvuResult = await affair.execute();
-          affair.destroy();
-        } else {
-          console.log(`[${account.email}] 📜 [Cung Vụ] Đang chờ mẻ đan chín để gom làm cùng lúc. Tạm hoãn để tích lũy lượt.`);
-        }
+      if (canRunDailyAffairs) {
+        const affair = new AffairService(client);
+        cungvuResult = await affair.execute();
+        affair.destroy();
       } else {
-        console.log(`[${account.email}] 📜 [Cung Vụ] Đã đạt chỉ tiêu 5/5 lần hôm nay. Bỏ qua.`);
+        console.log(`[${account.email}] 📜 [Cung Vụ] Đang chờ mẻ đan chín để gom làm cùng lúc. Tạm hoãn để tích lũy lượt.`);
       }
 
       await new Promise(r => setTimeout(r, 1000));
 
-      if (currentNoivu < 5) {
-        if (canRunDailyAffairs) {
-          const trade = new TradeService(client);
-          noivuResult = await trade.execute();
-          trade.destroy();
-        } else {
-          console.log(`[${account.email}] 💼 [Nội Vụ] Đang chờ mẻ đan chín để gom làm cùng lúc. Tạm hoãn để tích lũy lượt.`);
-        }
+      if (canRunDailyAffairs) {
+        const trade = new TradeService(client);
+        noivuResult = await trade.execute();
+        trade.destroy();
       } else {
-        console.log(`[${account.email}] 💼 [Nội Vụ] Đã đạt chỉ tiêu 5/5 lần hôm nay. Bỏ qua.`);
+        console.log(`[${account.email}] 💼 [Nội Vụ] Đang chờ mẻ đan chín để gom làm cùng lúc. Tạm hoãn để tích lũy lượt.`);
       }
 
       const updatedNaudan = currentNaudan + (naudanResult.hasAction ? 1 : 0);
@@ -148,23 +140,14 @@ class TaskRunner {
       const updatedNoivu = currentNoivu + (noivuResult.hasAction ? 1 : 0);
 
       let nextRunTime;
-      if (updatedNaudan >= 5 && updatedCungvu >= 5 && updatedNoivu >= 5) {
+      if (updatedNaudan >= 5) {
         nextRunTime = getTomorrowMidnightGMT7();
-        console.log(`[${account.email}] 🎉 Đã hoàn tất toàn bộ nhiệm vụ trong ngày (5/5). Đặt lịch chạy tiếp vào đầu ngày mai: ${nextRunTime}`);
-      } else if (updatedNaudan < 5) {
+        console.log(`[${account.email}] 🎉 Đã hoàn tất toàn bộ 5/5 lượt nấu đan trong ngày (Cung vụ: ${updatedCungvu}, Nội vụ: ${updatedNoivu}). Đặt lịch chạy tiếp vào đầu ngày mai: ${nextRunTime}`);
+      } else {
         const cookCooldown = Number(naudanResult.minRemainSec) || 3600;
         const effectiveCooldown = Math.max(300, cookCooldown + 30);
         nextRunTime = new Date(Date.now() + effectiveCooldown * 1000);
         console.log(`[${account.email}] 🍲 Đang chờ mẻ đan chín. Lượt chạy tiếp theo sau ${Math.round(effectiveCooldown / 60)} phút (${nextRunTime.toISOString()})`);
-      } else {
-        const cooldownCandidates = [];
-        if (updatedCungvu < 5) cooldownCandidates.push(cungvuResult.remainSec || 1800);
-        if (updatedNoivu < 5) cooldownCandidates.push(noivuResult.minRemainSec || 600);
-
-        const rawMin = Math.min(...cooldownCandidates);
-        const effectiveCooldown = Math.max(300, rawMin);
-        nextRunTime = new Date(Date.now() + effectiveCooldown * 1000);
-        console.log(`[${account.email}] ⏰ Lượt chạy tiếp theo sau ${Math.round(effectiveCooldown / 60)} phút (${nextRunTime.toISOString()})`);
       }
 
       await this.noteManager.updateAccountRun(account, {

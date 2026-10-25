@@ -271,17 +271,17 @@ class NoteManager {
       dayRecord.dan = Math.min(5, dayRecord.dan + 1);
     }
     if (runResult.cungvu && runResult.cungvu.hasAction) {
-      dayRecord.cung = Math.min(5, dayRecord.cung + 1);
+      dayRecord.cung = dayRecord.cung + 1;
     }
     if (runResult.noivu && runResult.noivu.hasAction) {
-      dayRecord.noi = Math.min(5, dayRecord.noi + 1);
+      dayRecord.noi = dayRecord.noi + 1;
     }
 
     this.pruneOldHistory(accData.history, 31);
 
     const formattedJson = this.formatCompactJson(noteData);
     await this.saveRawContent(formattedJson);
-    console.log(`[NoteManager] ✅ Đã lưu Web Note [${accKey}]. Tiến độ: Đan: ${dayRecord.dan}/5, Cung: ${dayRecord.cung}/5, Nội: ${dayRecord.noi}/5 | Tiếp theo: ${accData.nextRun}`);
+    console.log(`[NoteManager] ✅ Đã lưu Web Note [${accKey}]. Tiến độ: Đan: ${dayRecord.dan}/5, Cung: ${dayRecord.cung}, Nội: ${dayRecord.noi} | Tiếp theo: ${accData.nextRun}`);
     return accData;
   }
 }
