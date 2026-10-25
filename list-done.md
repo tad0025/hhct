@@ -1,0 +1,23 @@
+# Danh Sách Công Việc Đã Hoàn Thành (List Done)
+
+Dự án: **Hoàng Hậu Cát Tường (HHCT) Bot** — Hệ thống bot tự động hóa game Hoàng Hậu Cát Tường (100% Server-Authoritative State Sync).
+
+---
+
+## 📌 Tổng Hợp Tính Năng Đã Triển Khai
+
+### 1. Kiến Trúc & Quy Chuẩn (Architecture & Guidelines)
+- [x] **Chuẩn Hóa Quy Tắc Agent ([AGENTS.md](file:///d:/GAME/hhct/AGENTS.md))**: Tái cấu trúc bộ quy chuẩn kiến trúc bot, quy trình 4 bước, cấm cache tĩnh, bảo vệ biến môi trường (.env fail-fast), và bảng protocol đồng bộ 23 phân hệ.
+
+### 2. Xác Thực & Kết Nối (Auth & WebSocket)
+- [x] **Xác Thực Passport MuuGame & SDK Android (`yxgl_android`)**: Giải mã thuật toán băm mật khẩu MD5, tạo chữ ký `sn` với `APP_KEY`, gói tin Base64 gửi `passport.muugame.com/login/normalLogin` và xác thực SDK `logincheck/check/hhjxA1/muyou/V1_1`.
+- [x] **Bắt Tay Gateway WebSocket & Game WebSocket ([GameClient.js](file:///d:/GAME/hhct/src/core/GameClient.js))**: Tự động bắt tay Gateway WS (port 6868), định tuyến máy chủ theo `cp_sid`, tính toán mã hóa động `generateGameServerCode` và `autoAddCode`, duy trì heartbeat định kỳ `101102`, giải phóng bộ nhớ và ngắt kết nối an toàn khi hoàn thành phiên.
+
+### 3. Phân Hệ Tự Động Hóa (Game Services)
+- [x] **Nấu Đan (Ngự Thiện Phòng - [KitchenService.js](file:///d:/GAME/hhct/src/domains/kitchen/KitchenService.js))**: Tự động thu hoạch toàn bộ bếp chín (`144104`), tự động nấu công thức phù hợp với nguyên liệu tồn kho trong túi (`144103`), tuân thủ nghiêm ngặt nguyên tắc Zero Resource Waste (không dùng Vàng mua nguyên liệu), tính toán thời gian chín kế tiếp.
+- [x] **Cung Vụ Triều Đình ([AffairService.js](file:///d:/GAME/hhct/src/domains/daily/AffairService.js))**: Tự động phê duyệt các sự vụ tự nhiên khả dụng (`102102`), ưu tiên lựa chọn phương án nhận Cung Vận (EXP Tước Vị), tuyệt đối không dùng Cung Vụ Lệnh, tính toán thời gian hồi lượt tự nhiên.
+- [x] **Sắp Xếp Nội Vụ ([TradeService.js](file:///d:/GAME/hhct/src/domains/daily/TradeService.js))**: Tự động thu hoạch Bạc, Thảo Dược, Binh Lực khả dụng (`102101`), không dùng vật phẩm tăng tốc, tính toán thời gian hồi lượt tự nhiên.
+- [x] **Quản Lý Phiên & Đồng Bộ Web Note 31 Ngày ([NoteManager.js](file:///d:/GAME/hhct/src/core/NoteManager.js), [TaskRunner.js](file:///d:/GAME/hhct/src/runners/TaskRunner.js))**: Mỗi nhiệm vụ thực hiện 5 lần/ngày. Khi xong phiên, tính toán `nextRunTime` tối ưu dựa trên cooldown và ngắt kết nối WebSocket ngay lập tức. Khi đạt 5/5 lần cho cả 3 nhiệm vụ, thời gian chạy tự động chỉ sang đầu ngày tiếp theo (`00:00:01` GMT+7). Tự động đồng bộ và lưu trữ lịch sử 31 ngày gần nhất lên Web Note `https://van900379.onrender.com/notes/hhct-naudan-cungvu-noivu`.
+
+### 4. Công Cụ & Tối Ưu (Tools & Optimization)
+- [x] **Trích Xuất Danh Sách Toàn Bộ Máy Chủ ([get_servers.js](file:///d:/GAME/hhct/get_servers.js))**: Phân tích dữ liệu Gateway/CDN tĩnh từ Server MuuGame (`yxgl_android`), trích xuất đầy đủ 850 máy chủ (828 máy chủ đang hoạt động) kèm đầy đủ thông số (`cp_sid`, tên server, cụm, WebSocket game URL, port, server gộp, trạng thái, ngày mở) ra file dữ liệu [servers.json](file:///d:/GAME/hhct/servers.json).
