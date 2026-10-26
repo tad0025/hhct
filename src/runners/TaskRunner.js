@@ -4,14 +4,14 @@ const GameClient = require('../core/GameClient');
 const KitchenService = require('../domains/kitchen/KitchenService');
 const AffairService = require('../domains/daily/AffairService');
 const TradeService = require('../domains/daily/TradeService');
+const { isInBlackoutWindow, getBlackoutResumeTime } = require('../config/constants');
 
 function getTomorrowMidnightGMT7() {
-  const now = new Date();
-  const utc = now.getTime() + (now.getTimezoneOffset() * 60000);
-  const vnTime = new Date(utc + (3600000 * 7));
-  vnTime.setDate(vnTime.getDate() + 1);
-  vnTime.setHours(0, 0, 1, 0);
-  return new Date(vnTime.getTime() - (3600000 * 7));
+  const vnMs = Date.now() + (7 * 3600 * 1000);
+  const vnDate = new Date(vnMs);
+  vnDate.setUTCDate(vnDate.getUTCDate() + 1);
+  vnDate.setUTCHours(0, 1, 0, 0);
+  return new Date(vnDate.getTime() - (7 * 3600 * 1000));
 }
 
 function getVnToday() {
@@ -38,6 +38,19 @@ class TaskRunner {
     const todayStr = getVnToday();
     const accRecord = noteData && noteData[accKey];
 
+    if (isInBlackoutWindow()) {
+      const resumeTime = getBlackoutResumeTime();
+      console.log(`[${account.email}] ⏸️ Đang trong khung giờ nghỉ (18h30 - 21h00). Tự động đặt lịch chạy tiếp lúc 21h01.`);
+      await this.noteManager.updateAccountRun(account, {
+        roleName: accRecord?.name || '',
+        nextRunTime: resumeTime,
+        naudan: { hasAction: false },
+        cungvu: { hasAction: false },
+        noivu: { hasAction: false }
+      });
+      return { success: true, skipped: true, nextRunTime: resumeTime };
+    }
+
     let currentNaudan = 0;
     let currentCungvu = 0;
     let currentNoivu = 0;
@@ -52,7 +65,7 @@ class TaskRunner {
     if (currentNaudan >= 5) {
       const nextRun = getTomorrowMidnightGMT7();
       console.log(`[${account.email}] 🎯 Tài khoản đã hoàn thành 5/5 lượt nấu đan hôm nay (Cung vụ: ${currentCungvu}, Nội vụ: ${currentNoivu}).`);
-      console.log(`[${account.email}] ⏰ Hẹn giờ chạy tiếp theo vào ngày mai: ${nextRun}`);
+      console.log(`[${account.email}] ⏰ Hẹn giờ chạy tiếp theo vào ngày mai (00h01): ${nextRun}`);
       await this.noteManager.updateAccountRun(account, {
         roleName: accRecord?.name || '',
         nextRunTime: nextRun,
@@ -69,6 +82,19 @@ class TaskRunner {
     let client = null;
 
     try {
+      if (isInBlackoutWindow()) {
+        const resumeTime = getBlackoutResumeTime();
+        console.log(`[${account.email}] ⏸️ Đang trong khung giờ nghỉ (18h30 - 21h00 GMT+7). Tuyệt đối không login game. Tự động đặt lịch chạy tiếp lúc 21h01.`);
+        await this.noteManager.updateAccountRun(account, {
+          roleName: accRecord?.name || '',
+          nextRunTime: resumeTime,
+          naudan: { hasAction: false },
+          cungvu: { hasAction: false },
+          noivu: { hasAction: false }
+        });
+        return { success: true, skipped: true, nextRunTime: resumeTime };
+      }
+
       console.log(`[${account.email}] [1/4] Đăng nhập Passport MuuGame...`);
       const loginData = await loginPassport(account.email, account.password);
 
@@ -112,6 +138,20 @@ class TaskRunner {
         console.log(`[${account.email}] 🍲 [Nấu Đan] Đã đạt chỉ tiêu 5/5 lần hôm nay. Bỏ qua.`);
       }
 
+      if (isInBlackoutWindow()) {
+        client.close();
+        const resumeTime = getBlackoutResumeTime();
+        console.log(`[${account.email}] ⏸️ Chạm mốc 18h30 trong khi chạy. Cưỡng chế ngắt WebSocket và đặt lịch chạy tiếp lúc 21h01.`);
+        await this.noteManager.updateAccountRun(account, {
+          roleName,
+          nextRunTime: resumeTime,
+          naudan: naudanResult,
+          cungvu: cungvuResult,
+          noivu: noivuResult
+        });
+        return { success: true, skipped: true, nextRunTime: resumeTime };
+      }
+
       await new Promise(r => setTimeout(r, 1000));
 
       const shouldSyncWithDan = currentNaudan < 5 && naudanResult.isCooking;
@@ -123,6 +163,20 @@ class TaskRunner {
         affair.destroy();
       } else {
         console.log(`[${account.email}] 📜 [Cung Vụ] Đang chờ mẻ đan chín để gom làm cùng lúc. Tạm hoãn để tích lũy lượt.`);
+      }
+
+      if (isInBlackoutWindow()) {
+        client.close();
+        const resumeTime = getBlackoutResumeTime();
+        console.log(`[${account.email}] ⏸️ Chạm mốc 18h30 trong khi chạy. Cưỡng chế ngắt WebSocket và đặt lịch chạy tiếp lúc 21h01.`);
+        await this.noteManager.updateAccountRun(account, {
+          roleName,
+          nextRunTime: resumeTime,
+          naudan: naudanResult,
+          cungvu: cungvuResult,
+          noivu: noivuResult
+        });
+        return { success: true, skipped: true, nextRunTime: resumeTime };
       }
 
       await new Promise(r => setTimeout(r, 1000));
@@ -142,12 +196,18 @@ class TaskRunner {
       let nextRunTime;
       if (updatedNaudan >= 5) {
         nextRunTime = getTomorrowMidnightGMT7();
-        console.log(`[${account.email}] 🎉 Đã hoàn tất toàn bộ 5/5 lượt nấu đan trong ngày (Cung vụ: ${updatedCungvu}, Nội vụ: ${updatedNoivu}). Đặt lịch chạy tiếp vào đầu ngày mai: ${nextRunTime}`);
+        console.log(`[${account.email}] 🎉 Đã hoàn tất toàn bộ 5/5 lượt nấu đan trong ngày (Cung vụ: ${updatedCungvu}, Nội vụ: ${updatedNoivu}). Đặt lịch chạy tiếp vào ngày mai lúc 00h01: ${nextRunTime}`);
       } else {
         const cookCooldown = Number(naudanResult.minRemainSec) || 3600;
         const effectiveCooldown = Math.max(300, cookCooldown + 30);
-        nextRunTime = new Date(Date.now() + effectiveCooldown * 1000);
-        console.log(`[${account.email}] 🍲 Đang chờ mẻ đan chín. Lượt chạy tiếp theo sau ${Math.round(effectiveCooldown / 60)} phút (${nextRunTime.toISOString()})`);
+        const calculatedNext = new Date(Date.now() + effectiveCooldown * 1000);
+        if (isInBlackoutWindow(calculatedNext)) {
+          nextRunTime = getBlackoutResumeTime(calculatedNext);
+          console.log(`[${account.email}] 🍲 Đang chờ mẻ đan chín. Thời gian chín rơi vào khung giờ nghỉ (18h30 - 21h00), chuyển lịch sang 21h01 (${nextRunTime.toISOString()})`);
+        } else {
+          nextRunTime = calculatedNext;
+          console.log(`[${account.email}] 🍲 Đang chờ mẻ đan chín. Lượt chạy tiếp theo sau ${Math.round(effectiveCooldown / 60)} phút (${nextRunTime.toISOString()})`);
+        }
       }
 
       await this.noteManager.updateAccountRun(account, {
@@ -167,7 +227,10 @@ class TaskRunner {
       };
     } catch (err) {
       console.error(`[${account.email}] ❌ Lỗi trong phiên làm việc: ${err.message}`);
-      const fallbackNext = new Date(Date.now() + 15 * 60 * 1000);
+      let fallbackNext = new Date(Date.now() + 15 * 60 * 1000);
+      if (isInBlackoutWindow(fallbackNext)) {
+        fallbackNext = getBlackoutResumeTime(fallbackNext);
+      }
       try {
         await this.noteManager.updateAccountRun(account, {
           roleName: '',

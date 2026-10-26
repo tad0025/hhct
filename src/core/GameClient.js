@@ -1,6 +1,6 @@
 const WebSocket = require('ws');
 const { encodeMsg, decodeBuffer } = require('./protocol');
-const { CONFIG } = require('../config/constants');
+const { CONFIG, isInBlackoutWindow } = require('../config/constants');
 
 class GameClient {
   constructor(serverInfo, rcode, gateId, encryptHelper, account) {
@@ -13,6 +13,7 @@ class GameClient {
     this.autoId = 1;
     this.heartbeatTimer = null;
     this.connectTimer = null;
+    this.blackoutWatchdog = null;
     this.isReady = false;
     this.isManualClosed = false;
     this.isKicked = false;
@@ -51,6 +52,9 @@ class GameClient {
 
   connect() {
     return new Promise((resolve, reject) => {
+      if (isInBlackoutWindow()) {
+        return reject(new Error(`[${this.email}] Từ chối kết nối: Đang trong khung giờ nghỉ (18h30 - 21h00 GMT+7).`));
+      }
       let isSettled = false;
       this.connectTimer = setTimeout(() => {
         if (!isSettled) {
@@ -88,6 +92,13 @@ class GameClient {
       const targetCodeServerId = (Number(this.serverInfo.mainServerId) > 0) ? Number(this.serverInfo.mainServerId) : Number(this.serverInfo.serverId);
       this.encryptHelper.generateGameServerCode(targetCodeServerId, this.rcode);
       this.autoId = this.encryptHelper.autoAddCode + 1;
+
+      this.blackoutWatchdog = setInterval(() => {
+        if (isInBlackoutWindow()) {
+          console.warn(`[${this.email}] ⛔ Chạm khung giờ nghỉ (18h30 - 21h00 GMT+7). Cưỡng chế ngắt WebSocket ngay lập tức!`);
+          this.close();
+        }
+      }, 1000);
 
       const wsUrl = `wss://${this.serverInfo.ip}:${this.serverInfo.port}`;
       try {
@@ -237,6 +248,11 @@ class GameClient {
   }
 
   sendRaw(buffer) {
+    if (isInBlackoutWindow()) {
+      console.warn(`[${this.email}] ⛔ Chạm khung giờ nghỉ (18h30 - 21h00 GMT+7). Cưỡng chế ngắt WebSocket!`);
+      this.close();
+      return false;
+    }
     if (this.ws && this.ws.readyState === WebSocket.OPEN) {
       this.ws.send(buffer);
       return true;
@@ -272,6 +288,10 @@ class GameClient {
   close() {
     this.isManualClosed = true;
     this.stopHeartbeat();
+    if (this.blackoutWatchdog) {
+      clearInterval(this.blackoutWatchdog);
+      this.blackoutWatchdog = null;
+    }
     if (this.connectTimer) {
       clearTimeout(this.connectTimer);
       this.connectTimer = null;

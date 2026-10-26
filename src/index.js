@@ -1,5 +1,5 @@
 const http = require('http');
-const { CONFIG } = require('./config/constants');
+const { CONFIG, isInBlackoutWindow } = require('./config/constants');
 const { loadAccounts } = require('./config/AccountLoader');
 const NoteManager = require('./core/NoteManager');
 const TaskRunner = require('./runners/TaskRunner');
@@ -90,6 +90,29 @@ async function main() {
       const noteData = await noteManager.fetchNoteData();
       const now = Date.now();
       const shouldLogStatus = (tickCount % 10 === 0);
+      const isBlackout = isInBlackoutWindow(now);
+
+      if (isBlackout) {
+        if (shouldLogStatus) {
+          console.log('[Scheduler] ⏸️ Đang trong khung giờ nghỉ (18h30 - 21h00 GMT+7). Tuyệt đối không login game. Tiếp tục chạy lúc 21h01.');
+        }
+        for (const acc of activeAccounts) {
+          if (runningAccounts.has(acc.accKey)) {
+            continue;
+          }
+          const accRecord = noteData && (noteData[acc.accKey] || (noteData.accounts && noteData.accounts[acc.accKey]));
+          const nextRunTimestamp = accRecord && accRecord.nextRun ? parseNextRunTimestamp(accRecord.nextRun) : 0;
+          if (now >= nextRunTimestamp) {
+            runningAccounts.add(acc.accKey);
+            try {
+              await runner.runAccount(acc);
+            } finally {
+              runningAccounts.delete(acc.accKey);
+            }
+          }
+        }
+        return;
+      }
 
       for (const acc of activeAccounts) {
         if (runningAccounts.has(acc.accKey)) {
