@@ -268,7 +268,7 @@ class NoteManager {
     dayRecord.noi = typeof dayRecord.noi === 'number' ? dayRecord.noi : (typeof dayRecord.noivu === 'number' ? dayRecord.noivu : 0);
 
     if (runResult.naudan && runResult.naudan.hasAction) {
-      dayRecord.dan = Math.min(5, dayRecord.dan + 1);
+      dayRecord.dan = Math.min(6, dayRecord.dan + 1);
     }
     if (runResult.cungvu && runResult.cungvu.hasAction) {
       dayRecord.cung = dayRecord.cung + 1;
@@ -281,7 +281,7 @@ class NoteManager {
 
     const formattedJson = this.formatCompactJson(noteData);
     await this.saveRawContent(formattedJson);
-    console.log(`[NoteManager] ✅ Đã lưu Web Note [${accKey}]. Tiến độ: Đan: ${dayRecord.dan}/5, Cung: ${dayRecord.cung}, Nội: ${dayRecord.noi} | Tiếp theo: ${accData.nextRun}`);
+    console.log(`[NoteManager] ✅ Đã lưu Web Note [${accKey}]. Tiến độ: Đan: ${dayRecord.dan}/6, Cung: ${dayRecord.cung}, Nội: ${dayRecord.noi} | Tiếp theo: ${accData.nextRun}`);
     return accData;
   }
 }

@@ -62,9 +62,9 @@ class TaskRunner {
       currentNoivu = typeof todayHistory.noi === 'number' ? todayHistory.noi : (Number(todayHistory.noivu) || 0);
     }
 
-    if (currentNaudan >= 5) {
+    if (currentNaudan >= 6) {
       const nextRun = getTomorrowMidnightGMT7();
-      console.log(`[${account.email}] 🎯 Tài khoản đã hoàn thành 5/5 lượt nấu đan hôm nay (Cung vụ: ${currentCungvu}, Nội vụ: ${currentNoivu}).`);
+      console.log(`[${account.email}] 🎯 Tài khoản đã hoàn thành 6/6 lượt nấu đan hôm nay (Cung vụ: ${currentCungvu}, Nội vụ: ${currentNoivu}).`);
       console.log(`[${account.email}] ⏰ Hẹn giờ chạy tiếp theo vào ngày mai (00h01): ${nextRun}`);
       await this.noteManager.updateAccountRun(account, {
         roleName: accRecord?.name || '',
@@ -76,7 +76,7 @@ class TaskRunner {
       return { success: true, skipped: true, nextRunTime: nextRun };
     }
 
-    console.log(`[${account.email}] 📊 Tiến độ hiện tại trong ngày: Nấu đan: ${currentNaudan}/5 | Cung vụ: ${currentCungvu} | Nội vụ: ${currentNoivu}`);
+    console.log(`[${account.email}] 📊 Tiến độ hiện tại trong ngày: Nấu đan: ${currentNaudan}/6 | Cung vụ: ${currentCungvu} | Nội vụ: ${currentNoivu}`);
 
     const encryptHelper = new EncryptHelper();
     let client = null;
@@ -130,12 +130,12 @@ class TaskRunner {
       let cungvuResult = { handledCount: 0, remainSec: 1800, hasAction: false };
       let noivuResult = { totalHarvested: 0, minRemainSec: 600, hasAction: false };
 
-      if (currentNaudan < 5) {
+      if (currentNaudan < 6) {
         const kitchen = new KitchenService(client);
         naudanResult = await kitchen.execute();
         kitchen.destroy();
       } else {
-        console.log(`[${account.email}] 🍲 [Nấu Đan] Đã đạt chỉ tiêu 5/5 lần hôm nay. Bỏ qua.`);
+        console.log(`[${account.email}] 🍲 [Nấu Đan] Đã đạt chỉ tiêu 6/6 lần hôm nay. Bỏ qua.`);
       }
 
       if (isInBlackoutWindow()) {
@@ -154,7 +154,7 @@ class TaskRunner {
 
       await new Promise(r => setTimeout(r, 1000));
 
-      const shouldSyncWithDan = currentNaudan < 5 && naudanResult.isCooking;
+      const shouldSyncWithDan = currentNaudan < 6 && naudanResult.isCooking;
       const canRunDailyAffairs = !shouldSyncWithDan || naudanResult.hasAction;
 
       if (canRunDailyAffairs) {
@@ -194,9 +194,9 @@ class TaskRunner {
       const updatedNoivu = currentNoivu + (noivuResult.hasAction ? 1 : 0);
 
       let nextRunTime;
-      if (updatedNaudan >= 5) {
+      if (updatedNaudan >= 6) {
         nextRunTime = getTomorrowMidnightGMT7();
-        console.log(`[${account.email}] 🎉 Đã hoàn tất toàn bộ 5/5 lượt nấu đan trong ngày (Cung vụ: ${updatedCungvu}, Nội vụ: ${updatedNoivu}). Đặt lịch chạy tiếp vào ngày mai lúc 00h01: ${nextRunTime}`);
+        console.log(`[${account.email}] 🎉 Đã hoàn tất toàn bộ 6/6 lượt nấu đan trong ngày (Cung vụ: ${updatedCungvu}, Nội vụ: ${updatedNoivu}). Đặt lịch chạy tiếp vào ngày mai lúc 00h01: ${nextRunTime}`);
       } else {
         const cookCooldown = Number(naudanResult.minRemainSec) || 3600;
         const effectiveCooldown = Math.max(300, cookCooldown + 30);
